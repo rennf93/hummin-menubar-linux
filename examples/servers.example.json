@@ -1,0 +1,45 @@
+{
+  "hostOrder": ["Mac", "Laptop", "NAS"],
+  "servers": [
+    {
+      "id": "mac-qwen",
+      "label": "Qwen 3.8 27B",
+      "host": "Mac",
+      "port": 9998,
+      "up": "launchctl load $HOME/Library/LaunchAgents/com.hummin.qwen.plist 2>/dev/null; launchctl start com.hummin.qwen",
+      "down": "launchctl stop com.hummin.qwen; launchctl unload $HOME/Library/LaunchAgents/com.hummin.qwen.plist 2>/dev/null",
+      "health": "launchctl print gui/501/com.hummin.qwen 2>/dev/null | grep -q 'state = running'"
+    },
+    {
+      "id": "laptop-ornith",
+      "label": "Ornith 1.5 35B",
+      "host": "Laptop",
+      "port": 9981,
+      "up": "ssh -o ConnectTimeout=3 -o BatchMode=yes user@laptop 'sudo systemctl start llama-ornith.service'",
+      "down": "ssh -o ConnectTimeout=3 -o BatchMode=yes user@laptop 'sudo systemctl stop llama-ornith.service'",
+      "health": "ssh -o ConnectTimeout=3 -o BatchMode=yes user@laptop 'systemctl is-active --quiet llama-ornith.service'",
+      "mutexGroup": "laptop-gpu"
+    },
+    {
+      "id": "nas-north",
+      "label": "North Mini Code",
+      "host": "NAS",
+      "port": 9992,
+      "up": "ssh user@nas 'cd /path/to/compose && sudo docker compose start north-mini-code'",
+      "down": "ssh user@nas 'cd /path/to/compose && sudo docker compose stop north-mini-code'",
+      "health": "ssh user@nas 'sudo docker ps --filter name=north-mini-code --filter status=running -q | grep -q .'"
+    },
+    {
+      "id": "mac-replay-trimmer",
+      "label": "Replay Trimmer",
+      "host": "Mac",
+      "port": 4100,
+      "up": "launchctl bootstrap gui/501 $HOME/Library/LaunchAgents/com.example.trimmer.plist 2>/dev/null; launchctl kickstart gui/501/com.example.trimmer",
+      "down": "launchctl bootout gui/501/com.example.trimmer 2>/dev/null; true",
+      "health": "launchctl print gui/501/com.example.trimmer 2>/dev/null | grep -q 'state = running'",
+      "modes": ["all", "strip", "off"],
+      "modeGet": "cat $HOME/.config/replay-trimmer/mode.txt 2>/dev/null || echo strip",
+      "modeSet": "echo {mode} > $HOME/.config/replay-trimmer/mode.txt"
+    }
+  ]
+}

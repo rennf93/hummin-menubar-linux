@@ -1,0 +1,4 @@
+#!/bin/sh
+# Run the app from a source checkout (repo root = this script's parent).
+dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+PYTHONPATH="$dir${PYTHONPATH:+:$PYTHONPATH}" exec python3 -m hummin_menubar "$@"

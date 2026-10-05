@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+*.egg-info/
+
+# personal fleet config (hostnames + shell commands): keep out of public repos
+servers.json
