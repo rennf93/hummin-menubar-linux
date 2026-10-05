@@ -12,7 +12,7 @@ from hummin_menubar.dbus import Connection  # noqa: E402
 def layout(conn, dest, path):
     rev, node = conn.call_blocking(
         dest, path, "com.canonical.dbusmenu", "GetLayout",
-        "iias", [0, -1, []], reply_signature="u(ia{sv}v)", timeout=5)
+        "iias", [0, -1, []], reply_signature="u(ia{sv}av)", timeout=5)
     return rev, node
 
 
@@ -28,7 +28,7 @@ def render(node, depth=0):
         print("  " * depth + "--------")
     else:
         print("  " * depth + f"{item_id:>3} {label!r}{dis}{extra}")
-    for sig, child in children[1]:
+    for sig, child in children:
         render(child, depth + 1)
 
 
