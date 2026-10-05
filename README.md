@@ -16,9 +16,12 @@ protocol directly over the session bus with the Python standard library alone
 
 ## Features (same as the macOS app)
 
-- Nested host submenus (Mac, Laptop, NAS - or whatever you define), each row
-  with Start / Stop / Restart and live state dots (running / stopped / in
-  flight), with per-host running counts in the root menu
+- One tray icon, live state dots (running / stopped / in flight) per server,
+  per-host running counts, and Start / Stop / Restart (+ mode switching) for
+  every server. The Linux menu is one level flatter than the Mac's - host
+  headers, then every server row with its actions in its own submenu - because
+  COSMIC's status-area popup expands only one submenu level; on KDE/GNOME/XFCE
+  it behaves like the Mac's nested tree
 - Config-driven: servers live in a personal `servers.json`, not in code. Adding
   a model or a machine never means recompiling
 - Mutex groups for servers that share a resource: starting one stops the

@@ -45,12 +45,16 @@ class App:
                 "label": ("s", "Config error (see log)"),
                 "enabled": ("b", False)})
         self.host_ids, self.row_ids, self.action_ids, self.mode_ids = {}, {}, {}, {}
+        # COSMIC's status-area popup can expand only ONE submenu level, so the
+        # Linux menu is flat: disabled host header rows, then every server row
+        # directly under the root with its actions as the row's own submenu.
+        # (The macOS app keeps its nested host -> server -> actions tree.)
         for host in self.host_order:
-            host_id = add(0, "host", static={
-                "children-display": ("s", "submenu")})
+            host_id = add(0, "hostheader", static={
+                "enabled": ("b", False)})
             self.host_ids[host] = host_id
             for s in (x for x in self.servers if x.host == host):
-                row_id = add(host_id, "row", static={
+                row_id = add(0, "row", static={
                     "children-display": ("s", "submenu")}, server=s)
                 self.row_ids[s.id] = row_id
                 for action, title in (("start", "Start"), ("stop", "Stop"),
