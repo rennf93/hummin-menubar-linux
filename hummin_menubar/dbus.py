@@ -447,6 +447,12 @@ class Connection:
 
     def add_signal(self, interface, member, arg0, fn):
         self._signals.append((interface, member, arg0, fn))
+        # The bus delivers broadcast signals only to connections with a matching rule
+        rule = f"type='signal',interface='{interface}',member='{member}'"
+        if arg0 is not None:
+            rule += f",arg0='{arg0}'"
+        self.call_blocking("org.freedesktop.DBus", "/org/freedesktop/DBus",
+                           "org.freedesktop.DBus", "AddMatch", "s", [rule])
 
     # reader
 
