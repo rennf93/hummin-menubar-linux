@@ -14,7 +14,7 @@ from .config import logs_directory
 
 def _popen(cmd):
     return subprocess.Popen(
-        ["/bin/bash", "-lc", cmd],
+        ["bash", "-lc", cmd],  # from PATH: NixOS has no /bin/bash
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         start_new_session=True)
 
@@ -63,7 +63,7 @@ def run_logged(cmd, timeout=5.0):
         return -1
     exit_code, out = _collect(p, timeout)
     line = (f"[{int(time.time())}] exit={exit_code} "
-            f"args=/bin/bash -lc {cmd} out={out[:2000]}\n")
+            f"args=bash -lc {cmd} out={out[:2000]}\n")
     append_to_log(logs_directory() + "/hummin-menubar-health.log", line)
     return exit_code
 

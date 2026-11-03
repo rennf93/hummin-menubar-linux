@@ -259,7 +259,9 @@ class Menu:
             delta = {k: v for k, v in wanted.items() if cur.get(k) != v}
             if delta:
                 cur.update(delta)
-                changed[item_id] = delta
+                # Send every property, not just the delta: Quickshell treats an update with an
+                # empty "removed" list as the full set and resets the rest (children-display too)
+                changed[item_id] = self.props_for(item_id)
         if changed:
             self.revision += 1
             updated = [(i, props) for i, props in sorted(changed.items())]
