@@ -8,6 +8,7 @@ CONFIG ?= $(HOME)/.config/hummin-menubar/servers.json
 
 check:
 	python3 -m compileall -q hummin_menubar
+	python3 -m unittest discover -s tests
 
 install: check
 	rm -rf $(LIBDIR)
