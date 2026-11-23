@@ -103,7 +103,7 @@ class App:
             state = pending.get(s.id)
             mark = _DOT_BUSY if state else (_DOT_UP if up else _DOT_DOWN)
             suffix = f"  {state}ing..." if state else ""
-            if not state and s.warm:
+            if not state and s.warm and up:
                 # persistent warm state, always visible on warm rows
                 warm = self.warm_state.get(s.id) if up else None
                 suffix += "  warming up" if warm == "warming-up" else ("  warm" if warm else "  cold")

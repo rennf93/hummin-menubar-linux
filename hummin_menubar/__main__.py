@@ -63,9 +63,16 @@ def main():
     width, height, argb = icon.render(_pick_icon_variant(conn))
     tray.set_icon(width, height, argb)
 
+    # A restarting shell (nixos-rebuild, serpantinum restart) can own the watcher name
+    # before it exports the object, so one try after 0.5 s is not enough: keep trying
+    # with a growing delay until a registration lands.
+    def register_until_ok(delays=(0.5, 1, 2, 4, 8, 15, 30)):
+        if delays and not tray.register():
+            threading.Timer(delays[0], register_until_ok, (delays[1:],)).start()
+
     def watcher_owner_changed(name, old, new):
         if name == WATCHER and new:
-            threading.Timer(0.5, tray.register).start()
+            threading.Timer(0.5, register_until_ok).start()
 
     conn.add_signal("org.freedesktop.DBus", "NameOwnerChanged",
                     WATCHER, watcher_owner_changed)
@@ -76,6 +83,7 @@ def main():
         app.log_main(f"loaded {len(servers)} servers from {path}")
 
     if not tray.register():
+        register_until_ok()
         print("hummin-menubar: no tray host yet; will retry when one appears "
               "(check the log for details)", file=sys.stderr)
 
