@@ -30,6 +30,7 @@ class App:
         self.lock = threading.Lock()
         self.pending = {}       # server id -> "start" | "stop" | "restart"
         self.warming = {}       # server id -> threading.Event (set = cancelled)
+        self.warm_state = {}    # server id -> "warming-up" | "warm"; absent = cold
         self.cached_up = {}     # server id -> bool
         self.cached_modes = {}  # server id -> str
         self.last_check = 0.0
@@ -100,7 +101,11 @@ class App:
                 host_up[s.host] = host_up.get(s.host, 0) + 1
             state = pending.get(s.id)
             mark = _DOT_BUSY if state else (_DOT_UP if up else _DOT_DOWN)
-            suffix = f"  {state}ing..." if state else ("  warming..." if s.id in self.warming else "")
+            suffix = f"  {state}ing..." if state else ""
+            if not state and s.warm:
+                # persistent warm state, always visible on warm rows
+                warm = self.warm_state.get(s.id) if up else None
+                suffix += "  warming up" if warm == "warming-up" else ("  warm" if warm else "  cold")
             mode = cached_modes.get(s.id)
             mode_text = f" \u00b7{mode}" if mode else ""
             port = f" :{s.port}" if s.port else ""
@@ -230,6 +235,7 @@ class App:
                     stop = self.warming.pop(server.id, None)
                     if stop:
                         stop.set()
+                    self.warm_state.pop(server.id, None)
             finally:
                 with self.lock:
                     self.pending.pop(server.id, None)
@@ -246,6 +252,7 @@ class App:
             return
         stop = threading.Event()
         self.warming[server.id] = stop
+        self.warm_state[server.id] = "warming-up"
         self.render()
 
         def work():
@@ -276,6 +283,7 @@ class App:
                     stop.wait(3)
                 if not healthy or stop.is_set():
                     self.log_action(f"{server.id} warm abandoned: /health never came up in 30 min")
+                    self.warm_state.pop(server.id, None)
                     return
                 body = _json.dumps({
                     "messages": [{"role": "user", "content": "Hi"}],
@@ -285,9 +293,11 @@ class App:
                                              headers=headers, method="POST")
                 with urllib.request.urlopen(req, timeout=3600) as r:
                     r.read()
+                self.warm_state[server.id] = "warm"
                 self.log_action(f"{server.id} warm exit=0")
             except Exception as exc:
                 self.log_action(f"{server.id} warm failed: {exc}")
+                self.warm_state.pop(server.id, None)
             finally:
                 self.warming.pop(server.id, None)
                 self.schedule_check(force=True)
