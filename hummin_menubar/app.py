@@ -304,6 +304,17 @@ class App:
                     self.log_action(f"{server.id} warm abandoned: /health never came up in 30 min")
                     self.warm_state.pop(server.id, None)
                     return
+                # a server already working on a prompt has its weights paged in, and a
+                # "Hi" would only queue behind that work (minutes to hours on a big model)
+                try:
+                    req = urllib.request.Request(base + "/slots", headers=headers)
+                    with urllib.request.urlopen(req, timeout=5) as r:
+                        if any(sl.get("is_processing") for sl in _json.loads(r.read())):
+                            self.warm_state[server.id] = "warm"
+                            self.log_action(f"{server.id} warm (busy, skipped Hi)")
+                            return
+                except Exception:
+                    pass
                 body = _json.dumps({
                     "messages": [{"role": "user", "content": "Hi"}],
                     "max_tokens": 1,
