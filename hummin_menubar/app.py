@@ -184,7 +184,10 @@ class App:
                     if kind == "up":
                         results[server_id] = (value == 0)
                     elif value[0] == 0:
-                        mode_results[server_id] = value[1].strip()
+                        # stderr is merged into the output (ssh warnings): the mode is the last line
+                        lines = value[1].strip().splitlines()
+                        if lines:
+                            mode_results[server_id] = lines[-1].strip()
         with self.lock:
             self.cached_up = results
             self.cached_modes = mode_results
