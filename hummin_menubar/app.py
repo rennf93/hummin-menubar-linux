@@ -30,6 +30,7 @@ class App:
         self.lock = threading.Lock()
         self.pending = {}       # server id -> "start" | "stop" | "restart"
         self.warming = {}       # server id -> threading.Event (set = cancelled)
+        self.warm_tried = set() # warm rows already adopted this up-period
         self.warm_state = {}    # server id -> "warming-up" | "warm"; absent = cold
         self.cached_up = {}     # server id -> bool
         self.cached_modes = {}  # server id -> str
@@ -189,6 +190,21 @@ class App:
             self.cached_modes = mode_results
             self.last_check = time.time()
             self.checking = False
+            pending = dict(self.pending)
+        # Adopt warm rows that are up but were not started here (started
+        # externally, or before the menubar): one cheap "Hi" tells their real
+        # warmth instead of showing "cold" forever. Once per up-period.
+        for s in self.servers:
+            if not s.warm:
+                continue
+            if not results.get(s.id):
+                self.warm_tried.discard(s.id)
+                if s.id not in self.warming:
+                    self.warm_state.pop(s.id, None)
+            elif (s.id not in self.warm_state and s.id not in self.warming
+                  and s.id not in self.warm_tried and s.id not in pending):
+                self.warm_tried.add(s.id)
+                self.warm(s)
         self.render()
 
     # ---- actions -------------------------------------------------------------------
@@ -263,7 +279,7 @@ class App:
             headers = {"Content-Type": "application/json"}
             if server.warm_key_file:
                 try:
-                    with open(server.warm_key_file, encoding="utf-8") as f:
+                    with open(os.path.expanduser(server.warm_key_file), encoding="utf-8") as f:
                         headers["Authorization"] = f"Bearer {f.read().strip()}"
                 except OSError as exc:
                     self.log_action(f"{server.id} warm failed: cannot read {server.warm_key_file}: {exc}")
