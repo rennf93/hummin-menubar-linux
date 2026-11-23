@@ -20,6 +20,12 @@ class Server:
     modes: Optional[list] = None
     mode_get: Optional[str] = None
     mode_set: Optional[str] = None
+    # Optional post-start warm-up (same semantics as the macOS app): poll
+    # http://host_ip:port/health until listening, then send a one-token "Hi"
+    # so lazy-mmap weights page in before the first real prompt.
+    warm: bool = False
+    host_ip: Optional[str] = None
+    warm_key_file: Optional[str] = None
 
 
 @dataclass
@@ -77,7 +83,9 @@ def _parse(raw):
                 id=s["id"], label=s["label"], host=s["host"],
                 port=s.get("port"), up=s["up"], down=s["down"], health=s["health"],
                 mutex_group=s.get("mutexGroup"), modes=s.get("modes"),
-                mode_get=s.get("modeGet"), mode_set=s.get("modeSet")))
+                mode_get=s.get("modeGet"), mode_set=s.get("modeSet"),
+                warm=bool(s.get("warm", False)), host_ip=s.get("hostIp"),
+                warm_key_file=s.get("warmKeyFile")))
     except (KeyError, TypeError) as exc:
         raise ConfigError(f"servers.json is invalid: missing field {exc}")
     return MenubarConfig(host_order=raw.get("hostOrder", []), servers=servers)

@@ -29,6 +29,7 @@ class App:
 
         self.lock = threading.Lock()
         self.pending = {}       # server id -> "start" | "stop" | "restart"
+        self.warming = {}       # server id -> threading.Event (set = cancelled)
         self.cached_up = {}     # server id -> bool
         self.cached_modes = {}  # server id -> str
         self.last_check = 0.0
@@ -99,7 +100,7 @@ class App:
                 host_up[s.host] = host_up.get(s.host, 0) + 1
             state = pending.get(s.id)
             mark = _DOT_BUSY if state else (_DOT_UP if up else _DOT_DOWN)
-            suffix = f"  {state}ing..." if state else ""
+            suffix = f"  {state}ing..." if state else ("  warming..." if s.id in self.warming else "")
             mode = cached_modes.get(s.id)
             mode_text = f" \u00b7{mode}" if mode else ""
             port = f" :{s.port}" if s.port else ""
@@ -223,9 +224,72 @@ class App:
                 exit_code = run_logged(command)
                 self.log_action(
                     f"{server.id} {action} exit={exit_code} cmd={command}")
+                if exit_code == 0 and action in ("start", "restart") and server.warm:
+                    self.warm(server)
+                elif action == "stop":
+                    stop = self.warming.pop(server.id, None)
+                    if stop:
+                        stop.set()
             finally:
                 with self.lock:
                     self.pending.pop(server.id, None)
+                self.schedule_check(force=True)
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def warm(self, server):
+        """Post-start warm-up: poll /health, then send a one-token "Hi" so
+        lazy-mmap weights page in while the user is not waiting. Cheap: only
+        runs for warm-flagged rows, one thread each, Stop cancels it."""
+        if not server.host_ip or not server.port:
+            self.log_action(f"{server.id} warm skipped: no hostIp/port in config")
+            return
+        stop = threading.Event()
+        self.warming[server.id] = stop
+        self.render()
+
+        def work():
+            import json as _json
+            import urllib.error
+            import urllib.request
+            base = f"http://{server.host_ip}:{server.port}"
+            headers = {"Content-Type": "application/json"}
+            if server.warm_key_file:
+                try:
+                    with open(server.warm_key_file, encoding="utf-8") as f:
+                        headers["Authorization"] = f"Bearer {f.read().strip()}"
+                except OSError as exc:
+                    self.log_action(f"{server.id} warm failed: cannot read {server.warm_key_file}: {exc}")
+                    return
+            try:
+                deadline = time.time() + 1800
+                healthy = False
+                while time.time() < deadline and not stop.is_set():
+                    try:
+                        req = urllib.request.Request(base + "/health", headers=headers)
+                        with urllib.request.urlopen(req, timeout=4) as r:
+                            if r.status == 200:
+                                healthy = True
+                                break
+                    except Exception:
+                        pass
+                    stop.wait(3)
+                if not healthy or stop.is_set():
+                    self.log_action(f"{server.id} warm abandoned: /health never came up in 30 min")
+                    return
+                body = _json.dumps({
+                    "messages": [{"role": "user", "content": "Hi"}],
+                    "max_tokens": 1,
+                }).encode()
+                req = urllib.request.Request(base + "/v1/chat/completions", data=body,
+                                             headers=headers, method="POST")
+                with urllib.request.urlopen(req, timeout=3600) as r:
+                    r.read()
+                self.log_action(f"{server.id} warm exit=0")
+            except Exception as exc:
+                self.log_action(f"{server.id} warm failed: {exc}")
+            finally:
+                self.warming.pop(server.id, None)
                 self.schedule_check(force=True)
 
         threading.Thread(target=work, daemon=True).start()
